@@ -1,7 +1,6 @@
 #!/bin/bash
 set -e
 
-# Load environment variables from .env if it exists
 if [ -f .env ]; then
     echo "Loading .env file..."
     export $(grep -v '^#' .env | xargs)
@@ -10,7 +9,6 @@ else
     exit 1
 fi
 
-# Validate required variables
 if [ -z "$ASTRO_API_URL" ] || [ "$ASTRO_API_URL" = "https://your-org.astronomer.run/your-deployment-id" ]; then
     echo "Error: ASTRO_API_URL not configured in .env"
     exit 1
@@ -53,7 +51,6 @@ sam build --use-container
 
 echo "Deploying to AWS..."
 
-# Build S3 bucket argument
 if [ -n "$S3_BUCKET" ]; then
     S3_ARG="--s3-bucket $S3_BUCKET"
 else
@@ -78,4 +75,3 @@ sam deploy \
 echo ""
 echo "Deployment complete!"
 echo "Run 'sam list stack-outputs --stack-name $STACK_NAME --region $AWS_REGION' to get the API URL"
-
