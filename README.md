@@ -2,6 +2,8 @@
 
 This repo contains an Airflow plugin and AWS Lambda function that allows you to create a Human in the Loop (HITL) workflow using Airflow and Slack.
 
+![Slack message example](src/img/slack_message.png)
+
 ## Prerequisites
 
 - An Astro Deployment running Airflow 3.1+. A [free trial](https://www.astronomer.io/lp/signup/?utm_source=github&utm_medium=content&utm_campaign=content-airflow-slack-integration-1-26) is available.
