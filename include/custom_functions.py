@@ -1,5 +1,6 @@
 import random
 
+
 def get_open_tickets(num: int) -> list[dict]:
     sample_tickets = [
         {

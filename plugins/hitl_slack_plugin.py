@@ -18,7 +18,7 @@ async def ping():
     return {
         "message": "pong",
         "lambda_url": LAMBDA_URL[:50] + "..." if LAMBDA_URL else None,
-        "webhook_secret_configured": bool(WEBHOOK_SECRET)
+        "webhook_secret_configured": bool(WEBHOOK_SECRET),
     }
 
 
@@ -36,25 +36,19 @@ async def test_lambda():
         "subject": "Test HITL Message",
         "body": "This is a test from the Airflow plugin",
         "options": ["Option A", "Option B"],
-        "params": {}
+        "params": {},
     }
 
-    headers = {
-        "X-Webhook-Secret": WEBHOOK_SECRET,
-        "Content-Type": "application/json"
-    }
+    headers = {"X-Webhook-Secret": WEBHOOK_SECRET, "Content-Type": "application/json"}
 
     try:
         resp = requests.post(
-            f"{LAMBDA_URL}/from-airflow",
-            json=test_payload,
-            headers=headers,
-            timeout=10
+            f"{LAMBDA_URL}/from-airflow", json=test_payload, headers=headers, timeout=10
         )
         return {
             "message": "Sent to Lambda",
             "lambda_status": resp.status_code,
-            "lambda_response": resp.json()
+            "lambda_response": resp.json(),
         }
     except requests.RequestException as e:
         return {"error": f"Failed to call Lambda: {e}"}
@@ -62,7 +56,9 @@ async def test_lambda():
 
 def send_hitl_to_lambda(dag_id, dag_run_id, task_id, subject, body, options, params):
     if not LAMBDA_URL or not WEBHOOK_SECRET:
-        logger.warning("Lambda not configured, skipping notification for %s/%s", dag_id, task_id)
+        logger.warning(
+            "Lambda not configured, skipping notification for %s/%s", dag_id, task_id
+        )
         return
 
     payload = {
@@ -72,74 +68,75 @@ def send_hitl_to_lambda(dag_id, dag_run_id, task_id, subject, body, options, par
         "subject": subject,
         "body": body,
         "options": options,
-        "params": params or {}
+        "params": params or {},
     }
 
-    headers = {
-        "X-Webhook-Secret": WEBHOOK_SECRET,
-        "Content-Type": "application/json"
-    }
+    headers = {"X-Webhook-Secret": WEBHOOK_SECRET, "Content-Type": "application/json"}
 
     try:
         resp = requests.post(
-            f"{LAMBDA_URL}/from-airflow",
-            json=payload,
-            headers=headers,
-            timeout=10
+            f"{LAMBDA_URL}/from-airflow", json=payload, headers=headers, timeout=10
         )
         logger.info("Sent to Lambda: %s", resp.status_code)
     except requests.RequestException as e:
         logger.error("Failed to send to Lambda: %s", e)
 
 
-@hookimpl
-def on_task_instance_running(previous_state, task_instance):
-    try:
-        state_value = getattr(previous_state, "value", str(previous_state)).lower()
-        if state_value != "queued":
-            logger.debug("Skipping - previous_state=%s (not queued)", previous_state)
-            return
-
-        context = task_instance.get_template_context()
-        task = context.get("task")
-
-        hitl_operators = {"HITLOperator", "ApprovalOperator", "HITLBranchOperator", "HITLEntryOperator"}
-        task_class_name = type(task).__name__
-        
-        if task_class_name not in hitl_operators:
-            return
-
-        logger.info("Detected HITL task: %s/%s, previous_state=%s", task_instance.dag_id, task_instance.task_id, previous_state)
-
-        raw_params = getattr(task, 'params', {})
-        if hasattr(raw_params, 'dump'):
-            params = raw_params.dump()
-        elif hasattr(raw_params, 'to_dict'):
-            params = raw_params.to_dict()
-        else:
-            try:
-                params = dict(raw_params) if raw_params else {}
-            except (TypeError, ValueError):
-                params = {}
-
-        send_hitl_to_lambda(
-            dag_id=task_instance.dag_id,
-            dag_run_id=task_instance.run_id,
-            task_id=task_instance.task_id,
-            subject=task.subject,
-            body=task.body,
-            options=list(task.options),
-            params=params
-        )
-
-    except Exception as e:
-        logger.exception("Error in listener: %s", e)
-
-
 class HITLSlackListener:
     @hookimpl
     def on_task_instance_running(self, previous_state, task_instance):
-        on_task_instance_running(previous_state, task_instance)
+        try:
+            state_value = getattr(previous_state, "value", str(previous_state)).lower()
+            if state_value != "queued":
+                logger.debug(
+                    "Skipping - previous_state=%s (not queued)", previous_state
+                )
+                return
+
+            context = task_instance.get_template_context()
+            task = context.get("task")
+
+            hitl_operators = {
+                "HITLOperator",
+                "ApprovalOperator",
+                "HITLBranchOperator",
+                "HITLEntryOperator",
+            }
+            task_class_name = type(task).__name__
+
+            if task_class_name not in hitl_operators:
+                return
+
+            logger.info(
+                "Detected HITL task: %s/%s, previous_state=%s",
+                task_instance.dag_id,
+                task_instance.task_id,
+                previous_state,
+            )
+
+            raw_params = getattr(task, "params", {})
+            if hasattr(raw_params, "dump"):
+                params = raw_params.dump()
+            elif hasattr(raw_params, "to_dict"):
+                params = raw_params.to_dict()
+            else:
+                try:
+                    params = dict(raw_params) if raw_params else {}
+                except (TypeError, ValueError):
+                    params = {}
+
+            send_hitl_to_lambda(
+                dag_id=task_instance.dag_id,
+                dag_run_id=task_instance.run_id,
+                task_id=task_instance.task_id,
+                subject=task.subject,
+                body=task.body,
+                options=list(task.options),
+                params=params,
+            )
+
+        except Exception as e:
+            logger.exception("Error in listener: %s", e)
 
 
 class HITLSlackPlugin(AirflowPlugin):

@@ -5,7 +5,7 @@ from airflow.providers.standard.operators.hitl import HITLOperator
 @dag
 def syntax_dag():
 
-    @task 
+    @task
     def get_message():
         return "Make a wise choice..."
 
@@ -17,16 +17,17 @@ def syntax_dag():
         body=_get_message_task,  # templatable
         options=["Bulbasaur", "Charmander", "Squirtle"],  # cannot be empty!
         defaults=["Charmander"],
-        params={"Message to your new Pokemon": "..."}
+        params={"Message to your new Pokemon": "..."},
     )
 
-    @task 
+    @task
     def print_response(hitl_output: dict):
         print(f"Starter Pokemon: {hitl_output['chosen_options']}")
-        print(f"Message to your new Pokemon: ${hitl_output['params_input']['Message to your new Pokemon']}")
+        print(
+            f"Message to your new Pokemon: ${hitl_output['params_input']['Message to your new Pokemon']}"
+        )
 
     _print_response = print_response(_syntax_example_hitl_task.output)
-
 
 
 syntax_dag()
