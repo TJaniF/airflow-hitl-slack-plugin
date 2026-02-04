@@ -1,12 +1,13 @@
 from airflow.providers.standard.operators.hitl import (
     HITLOperator,
 )
-from airflow.sdk import dag, task, Param, chain
+from airflow.sdk import dag, task, Param, chain, Asset
 from datetime import timedelta
 import random
 from typing import Literal
 from airflow_ai_sdk.models.base import BaseModel
 from pydantic_ai import Agent
+from include.custom_functions import read_all_decision_traces, check_the_roadmap
 
 
 class TicketResponse(BaseModel):
@@ -22,8 +23,13 @@ customer_success_agent = Agent(
     system_prompt="""
     You are friendly and helpful support agent generating answers to tickets.
     Make sure to address the customer by name in the response.
+
+    Tools: 
+    - `read_all_decision_traces`: Read all decision traces for previous reviews of your responses.
+    - `check_the_roadmap`: Check the roadmap for the requested feature.
     """,
     output_type=TicketResponse,
+    tools=[read_all_decision_traces, check_the_roadmap],
 )
 
 
@@ -101,25 +107,29 @@ Please review for accuracy, tone, and completeness.""",
         ],
         multiple=False,
         defaults=["Escalate to CRE"],
-        params={"notes": Param(type=["string", "null"], default="...")},
+        params={
+            "Reason for decision": Param(type=["string", "null"], default="..."),
+            "Manual response": Param(type=["string", "null"], default="..."),
+        },
         execution_timeout=timedelta(
             hours=4
         ),  # after 4 hours the default option will be selected
     )
 
-    @task
+    @task(outlets=[Asset("new_decision")])
     def process_response(hitl_output: dict):
         if hitl_output["chosen_options"][0] == "Respond Manually":
             print("Respond Manually")
-            print(hitl_output["params_input"]["notes"])
+            print(hitl_output["params_input"]["Reason for decision"])
+            print(hitl_output["params_input"]["Manual response"])
             return
         if hitl_output["chosen_options"][0] == "Approve AI Response":
             print("Approved AI Response")
-            print(hitl_output["params_input"]["notes"])
+            print(hitl_output["params_input"]["Reason for decision"])
             return
         if hitl_output["chosen_options"][0] == "Escalate to CRE":
             print("Escalate to CRE")
-            print(hitl_output["params_input"]["notes"])
+            print(hitl_output["params_input"]["Reason for decision"])
             return
 
     _process_response = process_response(hitl_output=_review_ai_response.output)

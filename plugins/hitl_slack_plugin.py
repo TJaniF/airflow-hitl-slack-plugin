@@ -55,6 +55,10 @@ async def test_lambda():
 
 
 def send_hitl_to_lambda(dag_id, dag_run_id, task_id, subject, body, options, params):
+    logger.info(
+        "send_hitl_to_lambda called: dag=%s task=%s LAMBDA_URL=%s WEBHOOK_SECRET=%s",
+        dag_id, task_id, bool(LAMBDA_URL), bool(WEBHOOK_SECRET)
+    )
     if not LAMBDA_URL or not WEBHOOK_SECRET:
         logger.warning(
             "Lambda not configured, skipping notification for %s/%s", dag_id, task_id
@@ -86,9 +90,16 @@ class HITLSlackListener:
     @hookimpl
     def on_task_instance_running(self, previous_state, task_instance):
         try:
+            logger.info(
+                "HITL Listener triggered: dag=%s task=%s previous_state=%s",
+                task_instance.dag_id,
+                task_instance.task_id,
+                previous_state,
+            )
+
             state_value = getattr(previous_state, "value", str(previous_state)).lower()
             if state_value != "queued":
-                logger.debug(
+                logger.info(
                     "Skipping - previous_state=%s (not queued)", previous_state
                 )
                 return
@@ -103,8 +114,10 @@ class HITLSlackListener:
                 "HITLEntryOperator",
             }
             task_class_name = type(task).__name__
+            logger.info("Task class: %s", task_class_name)
 
             if task_class_name not in hitl_operators:
+                logger.info("Skipping - not a HITL operator: %s", task_class_name)
                 return
 
             logger.info(

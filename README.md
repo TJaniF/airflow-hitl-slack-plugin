@@ -1,26 +1,28 @@
-# Human in the Loop (HITL) - Airflow Slack Integration
+# Airflow Human-in-the–Loop (HITL) + Slack plugin to create a decision tracing context graph
 
-This repo contains an Airflow plugin and AWS Lambda function that allows you to create a Human in the Loop (HITL) workflow using Airflow and Slack.
+This repo contains an [Airflow plugin](plugins/hitl_slack_plugin.py) and [AWS Lambda function](lambda/) that allows you to create a Human-in-the–Loop (HITL) workflow where your Airflow Dag posts a message to Slack, pauses and waits for a human to respond to the message before continuing. The response and reasoning of the human is stored in Airflow and can be accessed via the Airflow API to make it available as context to an AI agent. You can learn more about the full use case and the decision tracing context graph in this blog post.
 
 ![Slack message example](src/img/slack_message.png)
 
-## Prerequisites
+## How to use this repo
+
+### Prerequisites
 
 - An Astro Deployment running Airflow 3.1+. A [free trial](https://www.astronomer.io/lp/signup/?utm_source=github&utm_medium=content&utm_campaign=content-airflow-slack-integration-1-26) is available.
 - A Slack workspace and permissions to create a Slack app and send messages to a channel. 
 - Access to AWS with permissions to create an AWS Lambda function, S3 bucket and IAM roles and policies.
-- Optional: If you want to run the [AI Support Ticket System](dags/ai_support_ticket_system.py) Dag, you need an OpenAI API key, the [Syntax example Dag](dags/syntax_dag.py) does not require an OpenAI API key.
+- Optional: If you want to run the full use case, you need an OpenAI API key, the [Syntax example Dag](dags/syntax_dag.py) does not require an OpenAI API key.
 
 ## Setup instructions
 
-Note that you need to setup the differnet components step by step switching between the components to retrieve and add the necessary credentials.
+Note that while setting up, you'll occassionally need to go back and forth between the components to retrieve and add the necessary credentials.
 
 ### Setting up the Astro Deployment
 
 1. Create a new Astro Deployment or use an existing one.
 2. Retrieve your Astro Deployment API URL and API token from the Astro Deployment page, see [the Astronomer docs for more information](https://www.astronomer.io/docs/astro/airflow-api).
 3. Deploy this project to your Astro Deployment using `astro deploy`. This will add both the example Dags, as well as the HITL Slack plugin.
-3. Add the following environment variables to the Astro Deployment as soon as you have retrieved them when setting up the AWS Lambda function.
+3. Add the following [environment variables](https://www.astronomer.io/docs/astro/environment-variables) to the Astro Deployment as soon as you have retrieved them when setting up the AWS Lambda function.
 - `HITL_LAMBDA_URL`: The URL of the AWS Lambda function that will be used to send HITL messages to the Slack channel.
 - `HITL_WEBHOOK_SECRET`: A shared secret for authenticating requests from the AWS Lambda function.
 - `OPEN_AI_API_KEY`: (optional) The API key for the OpenAI API if you want to run the [AI Support Ticket System](dags/ai_support_ticket_system.py) Dag.
