@@ -8,7 +8,7 @@ This repo contains an [Airflow plugin](plugins/hitl_slack_plugin.py) and [AWS La
 
 ### Prerequisites
 
-- An Astro Deployment running Airflow 3.1+. A [free trial](https://www.astronomer.io/lp/signup/?utm_source=github&utm_medium=content&utm_campaign=content-airflow-slack-integration-1-26) is available.
+- An Astro Deployment running Airflow 3.1+. A [free trial](https://www.astronomer.io/lp/signup/?utm_source=github&utm_medium=content&utm_campaign=260204-blog-decision-tracing-context-graph) is available.
 - A Slack workspace and permissions to create a Slack app and send messages to a channel. 
 - Access to AWS with permissions to create an AWS Lambda function, S3 bucket and IAM roles and policies.
 - Optional: If you want to run the full use case, you need an OpenAI API key, the [Syntax example Dag](dags/syntax_dag.py) does not require an OpenAI API key.
@@ -100,3 +100,8 @@ sam list stack-outputs --stack-name hitl-slack-webhook --region <your-aws-region
 1. Run the [Syntax example Dag](dags/syntax_dag.py) to test the setup. As soon as the `syntax_example_hitl_task` is running, a message will be sent to the Slack channel you configured.
 2. Click the button in the Slack message to open the modal and test the HITL workflow.
 3. Check the logs of the `print_response` task to see the response.
+4. The [gathering_decision_trace](dags/gathering_decision_trace.py) Dag can be used to query the HITL information from the latest run of a Dag and write it to a markdown file in the include/decision_traces directory, which is accessible to the AI agent in the [AI Support Ticket System](dags/ai_support_ticket_system.py) Dag.
+
+## Learn more
+
+- [Orchestrate LLMs and Agents with Apache Airflow® ebook](https://www.astronomer.io/ebooks/orchestrate-llms-and-agents-with-airflow?utm_source=github&utm_medium=content&utm_campaign=260204-blog-decision-tracing-context-graph)
