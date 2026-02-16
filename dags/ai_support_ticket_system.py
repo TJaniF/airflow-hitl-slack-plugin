@@ -19,7 +19,7 @@ class TicketResponse(BaseModel):
 
 
 customer_success_agent = Agent(
-    model="gpt-4o-mini",
+    model="gpt-5",
     system_prompt="""
     You are friendly and helpful support agent generating answers to tickets.
     Make sure to address the customer by name in the response.
@@ -29,6 +29,31 @@ customer_success_agent = Agent(
     - `check_the_roadmap`: Check the roadmap for the requested feature.
     """,
     output_type=TicketResponse,
+    tools=[read_all_decision_traces, check_the_roadmap],
+)
+
+
+class AIReviewedTicketResponse(BaseModel):
+    accuracy_rating: float
+    tone_rating: float
+    completeness_rating: float
+    helpfulness_rating: float
+    suggested_improvements: list[str]
+
+
+ai_reviewer_agent = Agent(
+    model="gpt-5",
+    system_prompt="""
+    You are a helpful assistant reviewing the accuracy, tone, 
+    and completeness of the AI-generated support ticket response.
+    Rate the response on a scale of 1 to 10 for each criterion:
+    - Accuracy: How accurate is the response?
+    - Tone: How is the tone of the response?
+    - Completeness: How complete is the response?
+    - Helpfulness: How helpful is the response?
+    Provide a list of suggested improvements for the response.
+    """,
+    output_type=AIReviewedTicketResponse,
     tools=[read_all_decision_traces, check_the_roadmap],
 )
 
@@ -54,8 +79,31 @@ def ai_support_ticket_system():
 
     _generate_ai_response = generate_ai_response(ticket=_fetch_pending_ticket)
 
+    @task.agent(agent=ai_reviewer_agent)
+    def ai_as_a_judge(ai_response: dict, original_ticket: dict):
+        import json
+
+        ticket_str = json.dumps(original_ticket)
+        ai_response_str = json.dumps(ai_response)
+
+        user_prompt = f"""
+        The original ticket is:
+        {ticket_str}
+
+        The AI response is:
+        {ai_response_str}
+        """
+
+        return user_prompt
+
+    _ai_as_a_judge = ai_as_a_judge(
+        ai_response=_generate_ai_response, original_ticket=_fetch_pending_ticket
+    )
+
     @task
-    def format_approval_request(ai_response: dict, original_ticket: dict):
+    def format_approval_request(
+        ai_response: dict, original_ticket: dict, ai_as_a_judge_response: dict
+    ):
         return {
             "ticket_info": f"**Ticket:** {original_ticket['ticket_id']}\n**Customer:** {original_ticket['customer']}\n**Subject:** {original_ticket['subject']}\n**Priority:** {original_ticket['priority']}",
             "summary": ai_response["summary"],
@@ -65,41 +113,77 @@ def ai_support_ticket_system():
             "suggested_tags": ai_response["suggested_tags"],
             "metadata": ai_response,
             "original_ticket": original_ticket,
+            "ai_as_a_judge_accuracy_rating": ai_as_a_judge_response["accuracy_rating"],
+            "ai_as_a_judge_tone_rating": ai_as_a_judge_response["tone_rating"],
+            "ai_as_a_judge_completeness_rating": ai_as_a_judge_response[
+                "completeness_rating"
+            ],
+            "ai_as_a_judge_helpfulness_rating": ai_as_a_judge_response[
+                "helpfulness_rating"
+            ],
+            "ai_as_a_judge_suggested_improvements": ai_as_a_judge_response[
+                "suggested_improvements"
+            ],
         }
 
     _format_approval_request = format_approval_request(
-        ai_response=_generate_ai_response, original_ticket=_fetch_pending_ticket
+        ai_response=_generate_ai_response,
+        original_ticket=_fetch_pending_ticket,
+        ai_as_a_judge_response=_ai_as_a_judge,
     )
 
-    # Human approval step
-    _review_ai_response = HITLOperator(
-        task_id="review_ai_response",
+    _human_approval = HITLOperator(
+        task_id="human_approval",
         subject="🎫 AI Support Response Ready for Review",
-        body="""**Please review the AI-generated support ticket response below:**
+        body="""\
+{% set data = ti.xcom_pull(task_ids='format_approval_request') %}
 
-{{ ti.xcom_pull(task_ids='format_approval_request')['ticket_info'] }}
+## Ticket Details
 
-**AI Summary:**
-{{ ti.xcom_pull(task_ids='format_approval_request')['summary'] }}
+{{ data['ticket_info'] }}
 
-**AI Suggested Priority:** {{ ti.xcom_pull(task_ids='format_approval_request')['priority'] }}
-**AI Confidence:** {{ "%.0f" | format(ti.xcom_pull(task_ids='format_approval_request')['confidence'] * 100) }}%
-**Suggested Tags:** {{ ti.xcom_pull(task_ids='format_approval_request')['suggested_tags'] | join(', ') }}
+---
 
-**AI Response:**
+## AI Summary
 
---------------------------------
+{{ data['summary'] }}
 
-{{ ti.xcom_pull(task_ids='format_approval_request')['ai_response'] }}
+| | |
+|---|---|
+| **Suggested Priority** | {{ data['priority'] }} |
+| **Confidence** | {{ "%.0f" | format(data['confidence'] * 100) }}% |
+| **Suggested Tags** | {{ data['suggested_tags'] | join(', ') }} |
 
---------------------------------
+---
 
-**Instructions:**
-- **Approve AI Response**: Send the AI response to the customer - optionall add a review of the AI response to the notes field
-- **Manual Response**: Send the manual response provided to the notes field 
-- **Escalate to CRE**: Escalate to the CRE team - add a reason for escalation to the notes field
+## AI Response
 
-Please review for accuracy, tone, and completeness.""",
+> {{ data['ai_response'] | replace('\\n', '\\n> ') }}
+
+---
+
+## AI Review Ratings
+
+| Criterion | Rating |
+|---|---|
+| Accuracy | {{ data['ai_as_a_judge_accuracy_rating'] }} |
+| Tone | {{ data['ai_as_a_judge_tone_rating'] }} |
+| Completeness | {{ data['ai_as_a_judge_completeness_rating'] }} |
+| Helpfulness | {{ data['ai_as_a_judge_helpfulness_rating'] }} |
+
+**Suggested Improvements:** {{ data['ai_as_a_judge_suggested_improvements'] | join('; ') }}
+
+---
+
+## Instructions
+
+| Action | Description |
+|---|---|
+| **Approve AI Response** | Send the AI response to the customer. Optionally add a review to the notes field. |
+| **Manual Response** | Write and send a manual response in the notes field. |
+| **Escalate to CRE** | Escalate to the CRE team. Add a reason for escalation to the notes field. |
+
+*Please review for accuracy, tone, and completeness.*""",
         options=[
             "Approve AI Response",
             "Respond Manually",
@@ -132,11 +216,11 @@ Please review for accuracy, tone, and completeness.""",
             print(hitl_output["params_input"]["Reason for decision"])
             return
 
-    _process_response = process_response(hitl_output=_review_ai_response.output)
+    _process_response = process_response(hitl_output=_human_approval.output)
 
     chain(
         _format_approval_request,
-        _review_ai_response,
+        _human_approval,
         _process_response,
     )
 
