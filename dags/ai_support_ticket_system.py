@@ -47,10 +47,10 @@ ai_reviewer_agent = Agent(
     You are a helpful assistant reviewing the accuracy, tone, 
     and completeness of the AI-generated support ticket response.
     Rate the response on a scale of 1 to 10 for each criterion:
-    - Accuracy: How accurate is the response?
-    - Tone: How is the tone of the response?
-    - Completeness: How complete is the response?
-    - Helpfulness: How helpful is the response?
+    - Accuracy: Is the information given in the response accurate?
+    - Tone: Is the tone of the response friendly and appropriate?
+    - Completeness: Is the response complete?
+    - Helpfulness: Is the response helpful and does it include actionable steps for the customer to take?
     Provide a list of suggested improvements for the response.
     """,
     output_type=AIReviewedTicketResponse,

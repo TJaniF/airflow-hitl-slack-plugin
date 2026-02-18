@@ -57,7 +57,10 @@ async def test_lambda():
 def send_hitl_to_lambda(dag_id, dag_run_id, task_id, subject, body, options, params):
     logger.info(
         "send_hitl_to_lambda called: dag=%s task=%s LAMBDA_URL=%s WEBHOOK_SECRET=%s",
-        dag_id, task_id, bool(LAMBDA_URL), bool(WEBHOOK_SECRET)
+        dag_id,
+        task_id,
+        bool(LAMBDA_URL),
+        bool(WEBHOOK_SECRET),
     )
     if not LAMBDA_URL or not WEBHOOK_SECRET:
         logger.warning(
@@ -99,9 +102,7 @@ class HITLSlackListener:
 
             state_value = getattr(previous_state, "value", str(previous_state)).lower()
             if state_value != "queued":
-                logger.info(
-                    "Skipping - previous_state=%s (not queued)", previous_state
-                )
+                logger.info("Skipping - previous_state=%s (not queued)", previous_state)
                 return
 
             context = task_instance.get_template_context()

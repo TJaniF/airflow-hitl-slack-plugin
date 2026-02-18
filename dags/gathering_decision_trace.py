@@ -72,7 +72,7 @@ def gathering_decision_trace():
         return dag_run_id
 
     @task
-    def query_hitl_decisions(dag_id: str, dag_run_id: str) -> list:
+    def query_decisions(dag_id: str, dag_run_id: str) -> list:
         endpoint = f"/dags/{dag_id}/dagRuns/{dag_run_id}/hitlDetails"
         result = make_api_request(endpoint)
 
@@ -125,7 +125,7 @@ def gathering_decision_trace():
 
     dag_id = "{{ params.dag_id }}"
     dag_run_id = get_latest_dag_run_id(dag_id=dag_id)
-    hitl_decisions = query_hitl_decisions(dag_id=dag_id, dag_run_id=dag_run_id)
+    hitl_decisions = query_decisions(dag_id=dag_id, dag_run_id=dag_run_id)
 
     compile_decision_trace(dag_id=dag_id, dag_run_id=dag_run_id, hitl_decisions=hitl_decisions)
 
